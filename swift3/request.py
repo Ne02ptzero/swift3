@@ -714,7 +714,7 @@ class Request(swob.Request):
             # STANDARD is ... standard.
             if self.headers['x-amz-storage-class'] != 'STANDARD':
                 # If infrequent access is supported, let it pass
-                if self.headers['x-amz-storage-class'] == 'STANDARD_IA' and CONF.enable_infrequent_access:
+                if self.headers['x-amz-storage-class'] == 'STANDARD_IA' and CONF.enable_infrequent_access == True:
                     self.storage_class = 'STANDARD_IA'
                 else:
                     raise InvalidStorageClass()
