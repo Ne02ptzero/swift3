@@ -418,6 +418,7 @@ class Request(swob.Request):
         # NOTE: app is not used by this class, need for compatibility of S3acl
         swob.Request.__init__(self, env)
         self._timestamp = None
+        self.storage_class = "STANDARD"
         self.access_key, self.signature = self._parse_auth_info()
         self.bucket_in_host = self._parse_host()
         self.container_name, self.object_name = self._parse_uri()
@@ -452,6 +453,9 @@ class Request(swob.Request):
         # Avoids that swift.swob.Response replaces Location header value
         # by full URL when absolute path given. See swift.swob for more detail.
         self.environ['swift.leave_relative_location'] = True
+
+        # Pass the Storage class information in the env
+        self.environ['swift.storage_class'] = self.storage_class
 
     def check_signature(self, secret):
         user_signature = self.signature
@@ -707,9 +711,13 @@ class Request(swob.Request):
                                       err_msg)
 
         if 'x-amz-storage-class' in self.headers:
-            # Only STANDARD is supported now.
+            # STANDARD is ... standard.
             if self.headers['x-amz-storage-class'] != 'STANDARD':
-                raise InvalidStorageClass()
+                # If infrequent access is supported, let it pass
+                if self.headers['x-amz-storage-class'] == 'STANDARD_IA' and CONF.enable_infrequent_access:
+                    self.storage_class = 'STANDARD_IA'
+                else:
+                    raise InvalidStorageClass()
 
         if 'x-amz-mfa' in self.headers:
             raise S3NotImplemented('MFA Delete is not supported.')
