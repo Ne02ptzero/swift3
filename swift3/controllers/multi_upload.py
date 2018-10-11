@@ -411,6 +411,8 @@ class UploadsController(Controller):
 
         obj = '%s/%s' % (req.object_name, upload_id)
 
+        req.environ['swift.storage_class'] = req.headers['x-amz-storage-class']
+
         req.headers.pop('Etag', None)
         req.headers.pop('Content-Md5', None)
 
