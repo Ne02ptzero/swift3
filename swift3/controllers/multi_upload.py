@@ -73,6 +73,16 @@ DEFAULT_MAX_UPLOADS = 1000
 
 MAX_COMPLETE_UPLOAD_BODY_SIZE = 2048 * 1024
 
+import redis
+import redis.sentinel
+
+# TODO ADAPT THIS FOR SENTINEL
+redis_host, redis_port = "127.0.0.1:6011".rsplit(':', 1)
+redis_port = int(redis_port)
+prefix = 'storage_class_'
+#sentinel = redis.sentinel.Sentinel(([redis_host, redis_port]))
+conn = redis.StrictRedis(host=redis_host, port=redis_port)
+#conn = sentinel.master_for('storage_class')
 
 def _get_upload_info(req, app, upload_id):
 
@@ -132,6 +142,13 @@ class PartController(Controller):
 
         upload_id = req.params['uploadId']
         _check_upload_info(req, self.app, upload_id)
+
+        # START PATCH : get from redis sentinel
+        # TODO handle errors
+        data = conn.get(prefix + upload_id)
+        if data:
+            req.headers['x-amz-storage-class'] = data
+        # END PATCH
 
         req.container_name += MULTIUPLOAD_SUFFIX
         req.object_name = '%s/%s/%d' % (req.object_name, upload_id,
@@ -423,6 +440,11 @@ class UploadsController(Controller):
         SubElement(result_elem, 'Key').text = req.object_name
         SubElement(result_elem, 'UploadId').text = upload_id
 
+        # START PATCH: set uploadId in redis
+        if 'x-amz-storage-class' in req.headers:
+            data = conn.set(prefix + upload_id, req.headers['x-amz-storage-class'], ex=3600) # Add nx=True ?
+        # END PATCH
+
         body = tostring(result_elem)
 
         return HTTPOk(body=body, content_type='application/xml')
@@ -567,6 +589,10 @@ class UploadController(Controller):
         for o in objects:
             container = req.container_name + MULTIUPLOAD_SUFFIX
             req.get_response(self.app, container=container, obj=o['name'])
+
+        # START PATCH: set remove uploadId from db
+        data = conn.delete(prefix + upload_id)
+        # END PATCH
 
         return HTTPNoContent()
 
@@ -717,4 +743,7 @@ class UploadController(Controller):
         resp.status = 200
         resp.content_type = "application/xml"
 
+        # START PATCH: set remove uploadId from db
+        data = conn.delete(prefix + upload_id)
+        # END PATCH
         return resp
