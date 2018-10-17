@@ -77,7 +77,7 @@ import redis
 import redis.sentinel
 
 # TODO ADAPT THIS FOR SENTINEL
-redis_host, redis_port = "127.0.0.1:6011".rsplit(':', 1)
+redis_host, redis_port = "0.0.0.0:6011".rsplit(':', 1)
 redis_port = int(redis_port)
 prefix = 'storage_class_'
 #sentinel = redis.sentinel.Sentinel(([redis_host, redis_port]))
@@ -147,7 +147,7 @@ class PartController(Controller):
         # TODO handle errors
         data = conn.get(prefix + upload_id)
         if data:
-            req.headers['x-amz-storage-class'] = data
+            req.environ['swift.storage_class'] = data
         # END PATCH
 
         req.container_name += MULTIUPLOAD_SUFFIX
